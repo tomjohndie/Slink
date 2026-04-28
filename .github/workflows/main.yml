@@ -1,0 +1,40 @@
+name: Scheduled Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: 
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+
+      - name: Sync upstream
+        id: sync_step # 给这一步加个ID，方便下面引用
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4.1
+        with:
+          upstream_sync_repo: miantiao-me/Sink # 给这一步输入项目名称
+          upstream_sync_branch: main
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          test_mode: false
+
+      # 添加 Telegram 通知步骤
+      - name: Send Telegram notification
+        if: always() # 无论同步成功还是失败都运行  “同步成功”不需要提醒（嫌吵）if: failure()  
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            项目同步状态报告：
+            
+            项目：${{ github.repository }}
+            结果：${{ job.status == 'success' && '✅ 同步成功' || '❌ 同步失败' }}
+            
+            查看详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
